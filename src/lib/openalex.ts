@@ -72,11 +72,28 @@ export async function oa(pathAndQuery: string): Promise<any> {
 
 // Specific API calls
 export async function getTextTopics(title?: string, abstract?: string): Promise<OpenAlexTextResponse> {
+  // Combine title and abstract for topic search
+  const searchText = [title, abstract].filter(Boolean).join(' ');
+  
+  if (!searchText.trim()) {
+    return { topics: [], primary_topic: undefined };
+  }
+
+  // Use autocomplete to find relevant topics
   const query = qp({
-    title: title || undefined,
-    abstract: abstract || undefined,
+    q: searchText,
   });
-  return oa(`/text?${query}`);
+  
+  const response = await oa(`/autocomplete/topics?${query}`);
+  
+  // Transform the response to match our expected format
+  const topics = response.results || [];
+  const primary_topic = topics.length > 0 ? topics[0] : undefined;
+  
+  return {
+    topics: topics.slice(0, 5), // Return top 5 topics
+    primary_topic,
+  };
 }
 
 export async function getTopFunders(topicIds: string[], fromYear: number): Promise<OpenAlexGroup[]> {

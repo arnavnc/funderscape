@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import { GraphNode, GraphEdge, GraphResponse, OpenAlexTopic, OpenAlexAutocomplete } from '../lib/types';
+import { fetchFunderPanel } from '../lib/panel';
 
 export default function Home() {
   const [selectedTopics, setSelectedTopics] = useState<OpenAlexAutocomplete[]>([
@@ -31,6 +32,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [graph, setGraph] = useState<GraphResponse | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [panelData, setPanelData] = useState<any>(null);
+  const [isLoadingPanel, setIsLoadingPanel] = useState<boolean>(false);
+  const [currentWorkIndex, setCurrentWorkIndex] = useState<number>(0);
   const [textInput, setTextInput] = useState<string>('');
   const [annotatedTopics, setAnnotatedTopics] = useState<OpenAlexTopic[]>([]);
   const [activeTab, setActiveTab] = useState<'topics' | 'text'>('topics');
@@ -105,13 +109,30 @@ export default function Home() {
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
-      .on('click', (_event: any, d: any) => {
+      .on('click', async (_event: any, d: any) => {
         // Remove selection from all rings
         rings.style('opacity', 0);
         // Add selection ring to clicked node
         rings.filter((node: any) => node.id === d.id)
           .style('opacity', 1);
         setSelectedNode(d);
+        setCurrentWorkIndex(0); // Reset carousel to first work
+        
+        // Fetch comprehensive panel data
+        setIsLoadingPanel(true);
+        try {
+          const topicIds = selectedTopics.map(t => t.id);
+          const panelData = await fetchFunderPanel(d.id, { 
+            topicIds, 
+            fromYear: new Date().getFullYear() - years + 1 
+          });
+          setPanelData(panelData);
+        } catch (error) {
+          console.error('Failed to fetch panel data:', error);
+          setPanelData(null);
+        } finally {
+          setIsLoadingPanel(false);
+        }
       })
       .on('mouseover', function(event: any, d: any) {
         d3.select(this).attr('stroke', '#000').attr('stroke-width', 3);
@@ -306,7 +327,7 @@ export default function Home() {
                       value={topicSearchQuery}
                       onChange={handleTopicSearchChange}
                       placeholder="Search for research topics..."
-                      className="w-full px-3 py-2 border border-gray-200 rounded-sm focus:outline-none focus:border-gray-400 text-sm font-medium text-gray-900"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-semibold text-gray-900 bg-white shadow-sm"
                     />
                     {isSearchingTopics && (
                       <div className="absolute right-3 top-2.5">
@@ -323,9 +344,9 @@ export default function Home() {
                             onClick={() => addTopic(topic)}
                             className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-b-0"
                           >
-                            <div className="font-medium">{topic.display_name}</div>
+                            <div className="font-semibold text-gray-900">{topic.display_name}</div>
                             {topic.hint && (
-                              <div className="text-gray-500 text-xs">{topic.hint}</div>
+                              <div className="text-gray-600 text-xs mt-1 line-clamp-2">{topic.hint}</div>
                             )}
                           </div>
                         ))}
@@ -341,14 +362,16 @@ export default function Home() {
                         {selectedTopics.map((topic) => (
                           <div
                             key={topic.id}
-                            className="flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded-sm text-xs"
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium border border-blue-200"
                           >
                             <span>{topic.display_name}</span>
                             <button
                               onClick={() => removeTopic(topic.id)}
-                              className="hover:bg-indigo-200 rounded-full p-0.5"
+                              className="hover:bg-blue-200 rounded-full p-1 transition-colors"
                             >
-                              ×
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
                             </button>
                           </div>
                         ))}
@@ -378,22 +401,27 @@ export default function Home() {
                   
                   {annotatedTopics.length > 0 && (
                     <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Found Topics:</h4>
+                      <h4 className="text-sm font-semibold text-gray-800 mb-2">Found Topics:</h4>
                       <div className="space-y-2">
                         {annotatedTopics.slice(0, 3).map((topic) => (
                           <div
                             key={topic.id}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-sm"
+                            className="flex items-start justify-between p-3 bg-gray-50 rounded-sm"
                           >
-                            <div>
-                              <div className="text-sm font-medium">{topic.display_name}</div>
-                              <div className="text-xs text-gray-500">{topic.id}</div>
+                            <div className="flex-1 pr-3">
+                              <div className="text-sm font-semibold text-gray-900 mb-1">{topic.display_name}</div>
+                              {topic.hint && (
+                                <div className="text-xs text-gray-600 line-clamp-2">{topic.hint}</div>
+                              )}
                             </div>
                             <button
                               onClick={() => addTopicFromAnnotation(topic)}
-                              className="px-2 py-1 text-xs bg-gray-900 text-white rounded-sm hover:bg-gray-800 transition-colors"
+                              className="flex-shrink-0 w-6 h-6 bg-gray-900 text-white rounded-sm hover:bg-gray-800 transition-colors flex items-center justify-center"
+                              title="Add topic"
                             >
-                              Add
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
                             </button>
                           </div>
                         ))}
@@ -420,7 +448,7 @@ export default function Home() {
               <button
                 onClick={handleBuildGraph}
                 disabled={isLoading || selectedTopics.length === 0}
-                className="w-full px-4 py-2 bg-gray-900 text-white rounded-sm hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold shadow-sm"
               >
                 {isLoading ? 'Building...' : 'Build Map'}
               </button>
@@ -428,121 +456,224 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Bottom Left Panel - Funder Card */}
-        <div className="col-span-3 row-span-12 border border-gray-200 p-6">
+        {/* Bottom Left Panel - Funder Card - Updated v2 */}
+        <div className="col-span-3 row-span-12 border border-gray-200 p-4">
           {selectedNode ? (
             <div className="h-full overflow-y-auto">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">{selectedNode.name}</h3>
-              
-              <div className="space-y-6">
-                {/* Key Statistics */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">📊 Key Statistics</h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-indigo-600">{selectedNode.count}</div>
-                      <div className="text-gray-600">Works in Topic</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {selectedNode.trend ? selectedNode.trend.reduce((sum: number, year: any) => sum + year.works_count, 0) : 'N/A'}
-                      </div>
-                      <div className="text-gray-600">Total Works (5yr)</div>
-                    </div>
+              {isLoadingPanel ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+                    <div className="text-sm text-gray-500">Loading funder details...</div>
                   </div>
                 </div>
-
-                {/* Funder Share */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">🎯 Topic Share</h4>
-                  <div className="text-sm text-gray-600">
-                    This funder represents <span className="font-semibold text-indigo-600">
-                      {graph ? Math.round((selectedNode.count / graph.nodes.reduce((sum: number, node: any) => sum + node.count, 0)) * 100) : 0}%
-                    </span> of all funding in this topic area.
-                  </div>
-                </div>
-
-                {/* Top Co-funders */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">🤝 Top Co-funders</h4>
-                  <div className="space-y-2">
-                    {graph ? (() => {
-                      console.log('Debug - selectedNode.id:', selectedNode.id);
-                      console.log('Debug - graph.edges:', graph.edges);
-                      const coFunderEdges = graph.edges.filter((edge: any) => edge.source === selectedNode.id || edge.target === selectedNode.id);
-                      console.log('Debug - coFunderEdges:', coFunderEdges);
-                      const maxCoFunderWeight = coFunderEdges.length > 0 ? Math.max(...coFunderEdges.map((e: any) => e.weight)) : 0;
-                      return coFunderEdges
-                        .sort((a: any, b: any) => b.weight - a.weight)
-                        .slice(0, 5)
-                        .map((edge: any, index: number) => {
-                          const coFunderId = edge.source === selectedNode.id ? edge.target : edge.source;
-                          console.log('Debug - coFunderId:', coFunderId);
-                          const coFunder = graph.nodes.find((node: any) => node.id === coFunderId);
-                          console.log('Debug - coFunder found:', coFunder);
-                          if (!coFunder) return null; // Skip if co-funder not found
-                          const strength = maxCoFunderWeight > 0 ? Math.round((edge.weight / maxCoFunderWeight) * 100) : 0;
-                        return (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                            <span className="text-gray-700 truncate flex-1 mr-2">{coFunder.name}</span>
-                            <div className="flex items-center">
-                              <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                                <div 
-                                  className="bg-indigo-500 h-2 rounded-full" 
-                                  style={{ width: `${strength}%` }}
-                                ></div>
-                              </div>
-                              <span className="text-xs text-gray-500 w-8">{strength}%</span>
+              ) : panelData ? (
+                <div className="space-y-4">
+                  {/* Debug: Enhanced UI with better readability */}
+                        {/* Header */}
+                        <header className="flex items-start gap-3">
+                          {panelData.funder.image_thumbnail_url && (
+                            <img 
+                              src={panelData.funder.image_thumbnail_url} 
+                              className="h-12 w-12 rounded-lg object-contain border border-gray-200" 
+                              alt=""
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-xl font-bold text-gray-900">{panelData.funder.display_name}</div>
+                            <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                              {panelData.funder.country_code && (
+                                <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                                  {panelData.funder.country_code}
+                                </span>
+                              )}
+                              {(panelData.funder.roles || []).map((r: any) => (
+                                <span key={r.role} className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 font-medium">
+                                  {r.role}
+                                </span>
+                              ))}
                             </div>
                           </div>
-                        );
-                        }).filter(Boolean);
-                      })() : null}
-                    {graph && (() => {
-                      const coFunderEdges = graph.edges.filter((edge: any) => edge.source === selectedNode.id || edge.target === selectedNode.id);
-                      return coFunderEdges.length === 0 ? (
-                        <div className="text-sm text-gray-500 italic">No co-funder relationships found</div>
-                      ) : null;
-                    })()}
-                  </div>
-                </div>
+                        </header>
 
-                {/* Geographic Distribution */}
-                {selectedNode.countries && selectedNode.countries.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">🌍 Geographic Reach</h4>
-                    <div className="space-y-1">
-                      {selectedNode.countries.slice(0, 4).map((country: any) => (
-                        <div key={country.code} className="flex justify-between text-sm">
-                          <span className="text-gray-600">{country.code}</span>
-                          <span className="font-medium">{country.count.toLocaleString()}</span>
-                        </div>
-                      ))}
+                        {/* KPIs */}
+                        <section className="grid grid-cols-3 gap-4 rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+                          <div className="text-center">
+                            <div className="flex items-center justify-center mb-2">
+                              <svg className="w-5 h-5 text-blue-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <div className="text-xs font-medium text-blue-700">Works (window)</div>
+                            </div>
+                            <div className="text-2xl font-bold text-blue-900">{panelData.kpis.worksInWindow.toLocaleString()}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="flex items-center justify-center mb-2">
+                              <svg className="w-5 h-5 text-green-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                              </svg>
+                              <div className="text-xs font-medium text-green-700">Works in topic</div>
+                            </div>
+                            <div className="text-2xl font-bold text-green-900">
+                              {panelData.kpis.worksInTopic?.toLocaleString?.() ?? '—'}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="flex items-center justify-center mb-2">
+                              <svg className="w-5 h-5 text-purple-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                              <div className="text-xs font-medium text-purple-700">OA share</div>
+                            </div>
+                            <div className="text-2xl font-bold text-purple-900">{Math.round(panelData.kpis.oaShare * 100)}%</div>
+                          </div>
+                          <div className="col-span-3 mt-3 pt-3 border-t border-blue-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-blue-700">Topic share</span>
+                              <span className="text-sm font-bold text-blue-900">
+                                {panelData.kpis.topicSharePct ? panelData.kpis.topicSharePct.toFixed(1) + '%' : '—'}
+                              </span>
+                            </div>
+                            {panelData.kpis.topicSharePct && (
+                              <div className="w-full bg-blue-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                                  style={{ width: `${Math.min(panelData.kpis.topicSharePct, 100)}%` }}
+                                ></div>
+                              </div>
+                            )}
+                          </div>
+                        </section>
+
+                        {/* Co-funders */}
+                        <section>
+                          <div className="flex items-center mb-3">
+                            <svg className="w-4 h-4 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <div className="text-sm font-semibold text-gray-800">Top co‑funders</div>
+                          </div>
+                          <div className="space-y-2">
+                            {panelData.cofunders?.length ? (
+                              panelData.cofunders.slice(0, 5).map((c: any, index: number) => {
+                                const maxCount = Math.max(...panelData.cofunders.slice(0, 5).map((item: any) => item.count));
+                                const percentage = (c.count / maxCount) * 100;
+                                const colors = ['bg-amber-500', 'bg-orange-500', 'bg-red-500', 'bg-pink-500', 'bg-rose-500'];
+                                
+                                return (
+                                  <div key={c.id} className="space-y-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
+                                        {index + 1}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between text-sm">
+                                          <span className="truncate text-gray-700 font-medium flex-1 mr-3">{c.name}</span>
+                                          <span className="tabular-nums text-gray-600 font-semibold flex-shrink-0">{c.count}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                      <div 
+                                        className={`${colors[index]} h-1.5 rounded-full transition-all duration-500`}
+                                        style={{ width: `${percentage}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-lg">No co‑funder relationships found</div>
+                            )}
+                          </div>
+                        </section>
+
+                        {/* Research Focus */}
+                        <section>
+                          <div className="flex items-center mb-3">
+                            <svg className="w-4 h-4 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <div className="text-sm font-semibold text-gray-800">Research focus</div>
+                          </div>
+                          <div className="space-y-3">
+                            {panelData.topicMix.groups?.slice(0, 5).map((g: any, index: number) => {
+                              const maxCount = Math.max(...(panelData.topicMix.groups?.slice(0, 5).map((item: any) => item.count) || [1]));
+                              const percentage = (g.count / maxCount) * 100;
+                              const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+                              
+                              return (
+                                <div key={g.key} className="space-y-2">
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="truncate text-gray-700 font-medium flex-1 mr-3">{g.key_display_name || g.key}</span>
+                                    <span className="tabular-nums text-gray-600 font-semibold flex-shrink-0">{g.count.toLocaleString()}</span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className={`${colors[index]} h-2 rounded-full transition-all duration-700 ease-out`}
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+
+                        {/* Top Sources */}
+                        <section>
+                          <div className="flex items-center mb-3">
+                            <svg className="w-4 h-4 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                            </svg>
+                            <div className="text-sm font-semibold text-gray-800">Top sources</div>
+                          </div>
+                          <div className="space-y-2">
+                            {panelData.venues.groups?.slice(0, 6).map((g: any, index: number) => {
+                              const maxCount = Math.max(...(panelData.venues.groups?.slice(0, 6).map((item: any) => item.count) || [1]));
+                              const percentage = (g.count / maxCount) * 100;
+                              const colors = ['bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500'];
+                              
+                              return (
+                                <div key={g.key} className="space-y-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="flex-shrink-0 w-3 h-3 rounded-full bg-gray-300 flex items-center justify-center">
+                                      <div 
+                                        className={`w-2 h-2 rounded-full ${colors[index]}`}
+                                      ></div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="truncate text-gray-700 font-medium flex-1 mr-3">{g.key_display_name || g.key}</span>
+                                        <span className="tabular-nums text-gray-600 font-semibold flex-shrink-0">{g.count.toLocaleString()}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                    <div 
+                                      className={`${colors[index]} h-1.5 rounded-full transition-all duration-500`}
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+
+
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">👆</div>
+                    <div className="text-sm">Click a node to view details</div>
+                    <div className="text-xs mt-2 text-gray-400">
+                      Explore funding patterns, co-funder relationships, and research focus
                     </div>
                   </div>
-                )}
-
-                {/* Research Focus */}
-                {selectedNode.topics && selectedNode.topics.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">🔬 Research Focus</h4>
-                    <div className="space-y-1">
-                      {selectedNode.topics.slice(0, 4).map((topic: any) => (
-                        <div key={topic.id} className="flex justify-between text-sm">
-                          <span className="text-gray-600 truncate flex-1 mr-2">{topic.name}</span>
-                          <span className="font-medium">{topic.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Additional Info */}
-                <div className="text-xs text-gray-500 pt-2 border-t">
-                  <div>Country: {selectedNode.country || 'Unknown'}</div>
-                  <div>Data from: {graph?.meta?.fromYear || 'N/A'} - {new Date().getFullYear()}</div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-gray-400">
@@ -607,19 +738,92 @@ export default function Home() {
           )}
         </div>
 
-        {/* Top Right Panel - Example Papers */}
-        <div className="col-span-3 row-span-6 border border-gray-200 p-6">
-          <div className="h-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Example Papers</h3>
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="p-3 bg-gray-50 rounded-sm">
-                  <div className="h-3 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-2 bg-gray-200 rounded w-3/4"></div>
+        {/* Top Right Panel - Example Works Carousel */}
+        <div className="col-span-3 row-span-6 border border-gray-200 p-4">
+          {selectedNode && panelData && panelData.exemplars && panelData.exemplars.length > 0 ? (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Example Works</h3>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1))}
+                    disabled={currentWorkIndex === 0}
+                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <span className="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                    {currentWorkIndex + 1} / {panelData.exemplars.length}
+                  </span>
+                  <button
+                    onClick={() => setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1))}
+                    disabled={currentWorkIndex === panelData.exemplars.length - 1}
+                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-              ))}
+              </div>
+              
+              <div className="flex-1 flex flex-col">
+                {(() => {
+                  const work = panelData.exemplars[currentWorkIndex];
+                  return (
+                    <div className="flex-1 flex flex-col bg-gray-50 rounded-lg p-4">
+                      <div className="flex-1">
+                        <h4 className="text-base font-bold text-gray-900 mb-3 line-clamp-3 leading-tight">
+                          {work.display_name}
+                        </h4>
+                        <div className="space-y-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-700">Year:</span>
+                            <span className="text-gray-900 font-medium">{work.publication_year}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-700">Citations:</span>
+                            <span className="text-gray-900 font-medium">{work.cited_by_count?.toLocaleString() ?? 0}</span>
+                          </div>
+                          {work.open_access?.is_oa && (
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold border border-green-200">
+                                Open Access
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-gray-200">
+                        <a
+                          href={work.id}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          View Paper
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📄</div>
+                <div className="text-sm">No example works available</div>
+                <div className="text-xs mt-1">Select a funder to view their publications</div>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
