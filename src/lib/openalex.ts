@@ -79,21 +79,71 @@ export async function getTextTopics(title?: string, abstract?: string): Promise<
     return { topics: [], primary_topic: undefined };
   }
 
-  // Use autocomplete to find relevant topics
+  // First try the simple autocomplete approach
   const query = qp({
     q: searchText,
   });
   
   const response = await oa(`/autocomplete/topics?${query}`);
-  
-  // Transform the response to match our expected format
   const topics = response.results || [];
-  const primary_topic = topics.length > 0 ? topics[0] : undefined;
-  
-  return {
-    topics: topics.slice(0, 5), // Return top 5 topics
-    primary_topic,
-  };
+
+  // If we found topics with simple search, return them
+  if (topics.length > 0) {
+    return {
+      topics: topics.slice(0, 5),
+      primary_topic: topics[0],
+    };
+  }
+
+  // If no topics found, try searching for works and extracting topics from them
+  try {
+    const worksQuery = qp({
+      search: searchText,
+      per_page: 10,
+      select: 'topics',
+    });
+
+    const worksResponse = await oa(`/works?${worksQuery}`);
+    const works = worksResponse.results || [];
+
+    // Extract and count topics from found works
+    const topicCounts = new Map<string, { id: string; display_name: string; count: number }>();
+    
+    works.forEach((work: any) => {
+      if (work.topics) {
+        work.topics.forEach((topic: any) => {
+          const key = topic.id;
+          if (topicCounts.has(key)) {
+            topicCounts.get(key)!.count++;
+          } else {
+            topicCounts.set(key, {
+              id: topic.id,
+              display_name: topic.display_name,
+              count: 1,
+            });
+          }
+        });
+      }
+    });
+
+    // Sort by frequency and return top topics
+    const extractedTopics = Array.from(topicCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map(topic => ({
+        id: topic.id,
+        display_name: topic.display_name,
+        score: topic.count / works.length, // Normalize by number of works
+      }));
+
+    return {
+      topics: extractedTopics,
+      primary_topic: extractedTopics[0],
+    };
+  } catch (error) {
+    console.warn('Failed to extract topics from works:', error);
+    return { topics: [], primary_topic: undefined };
+  }
 }
 
 export async function getTopFunders(topicIds: string[], fromYear: number): Promise<OpenAlexGroup[]> {

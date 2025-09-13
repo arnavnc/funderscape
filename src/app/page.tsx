@@ -38,6 +38,7 @@ export default function Home() {
   const [textInput, setTextInput] = useState<string>('');
   const [annotatedTopics, setAnnotatedTopics] = useState<OpenAlexTopic[]>([]);
   const [activeTab, setActiveTab] = useState<'topics' | 'text'>('topics');
+  const [expandedPanel, setExpandedPanel] = useState<'input' | 'content'>('input');
   
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -284,15 +285,46 @@ export default function Home() {
 
   return (
     <div className="h-screen w-screen bg-white overflow-hidden">
-      {/* 4-Panel Layout */}
-      <div className="grid grid-cols-12 grid-rows-12 h-full w-full">
+      {/* Collapsible Layout */}
+      <div className="flex h-full w-full">
         
-        {/* Top Left Panel - Search/Input */}
-        <div className="col-span-3 row-span-5 border border-gray-200 p-6">
+        {/* Input Panel - Collapsible */}
+        <div className={`${expandedPanel === 'input' ? 'w-1/3' : 'w-16'} transition-all duration-500 ease-in-out border-r border-gray-200 overflow-hidden relative ${expandedPanel === 'input' ? 'bg-white' : 'bg-gray-50'}`}>
+          {/* Always visible toggle button */}
+          <div className="absolute top-4 right-4 z-10">
+            <button
+              onClick={() => setExpandedPanel(expandedPanel === 'input' ? 'content' : 'input')}
+              className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md border border-gray-200 transition-all duration-200 hover:shadow-lg"
+              title={expandedPanel === 'input' ? 'Show content' : 'Show input'}
+            >
+              <svg className="w-5 h-5 text-gray-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {expandedPanel === 'input' ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                )}
+              </svg>
+            </button>
+          </div>
+          
+          {/* Collapsed state indicator */}
+          {expandedPanel !== 'input' && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-5">
+              <div className="text-xs text-gray-500 font-medium writing-mode-vertical-rl text-orientation-mixed">
+                Input
+              </div>
+            </div>
+          )}
+          
           <div className="h-full flex flex-col">
-            <h1 className="text-2xl font-bold text-indigo-700 mb-6">funderscape.</h1>
+            <div className="p-6 border-b border-gray-200">
+              <h1 className={`text-2xl font-bold text-indigo-700 transition-all duration-500 ${expandedPanel === 'input' ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}>
+                funderscape.
+              </h1>
+            </div>
             
-            <div className="flex-1 space-y-4">
+            {expandedPanel === 'input' && (
+              <div className="flex-1 space-y-4 p-6 pt-0 overflow-y-auto animate-in slide-in-from-left-4 duration-500">
               <div className="flex space-x-1">
                 <button
                   onClick={() => setActiveTab('topics')}
@@ -337,14 +369,14 @@ export default function Home() {
                     
                     {/* Dropdown with search results */}
                     {showTopicDropdown && topicSearchResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-sm shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                         {topicSearchResults.map((topic) => (
                           <div
                             key={topic.id}
                             onClick={() => addTopic(topic)}
                             className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-b-0"
                           >
-                            <div className="font-semibold text-gray-900">{topic.display_name}</div>
+                            <div className="font-semibold text-gray-900 truncate">{topic.display_name}</div>
                             {topic.hint && (
                               <div className="text-gray-600 text-xs mt-1 line-clamp-2">{topic.hint}</div>
                             )}
@@ -358,23 +390,25 @@ export default function Home() {
                   {selectedTopics.length > 0 && (
                     <div className="mt-3">
                       <div className="text-sm font-medium text-gray-700 mb-2">Selected Topics:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedTopics.map((topic) => (
-                          <div
-                            key={topic.id}
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium border border-blue-200"
-                          >
-                            <span>{topic.display_name}</span>
-                            <button
-                              onClick={() => removeTopic(topic.id)}
-                              className="hover:bg-blue-200 rounded-full p-1 transition-colors"
+                      <div className="max-h-20 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
+                        <div className="flex flex-wrap gap-1">
+                          {selectedTopics.map((topic) => (
+                            <div
+                              key={topic.id}
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium border border-blue-200"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
+                              <span className="truncate max-w-24">{topic.display_name}</span>
+                              <button
+                                onClick={() => removeTopic(topic.id)}
+                                className="hover:bg-blue-200 rounded-full p-0.5 transition-colors flex-shrink-0"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -402,21 +436,21 @@ export default function Home() {
                   {annotatedTopics.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-sm font-semibold text-gray-800 mb-2">Found Topics:</h4>
-                      <div className="space-y-2">
+                      <div className="max-h-32 overflow-y-auto space-y-2">
                         {annotatedTopics.slice(0, 3).map((topic) => (
                           <div
                             key={topic.id}
-                            className="flex items-start justify-between p-3 bg-gray-50 rounded-sm"
+                            className="flex items-start justify-between p-2 bg-gray-50 rounded-sm"
                           >
-                            <div className="flex-1 pr-3">
-                              <div className="text-sm font-semibold text-gray-900 mb-1">{topic.display_name}</div>
+                            <div className="flex-1 pr-2 min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 mb-1 truncate">{topic.display_name}</div>
                               {topic.hint && (
-                                <div className="text-xs text-gray-600 line-clamp-2">{topic.hint}</div>
+                                <div className="text-xs text-gray-600 line-clamp-1">{topic.hint}</div>
                               )}
                             </div>
                             <button
                               onClick={() => addTopicFromAnnotation(topic)}
-                              className="flex-shrink-0 w-6 h-6 bg-gray-900 text-white rounded-sm hover:bg-gray-800 transition-colors flex items-center justify-center"
+                              className="flex-shrink-0 w-5 h-5 bg-gray-900 text-white rounded-sm hover:bg-gray-800 transition-colors flex items-center justify-center"
                               title="Add topic"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,12 +486,41 @@ export default function Home() {
               >
                 {isLoading ? 'Building...' : 'Build Map'}
               </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Bottom Left Panel - Funder Card - Updated v2 */}
-        <div className="col-span-3 row-span-12 border border-gray-200 p-4">
+        {/* Content Panel - Collapsible */}
+        <div className={`${expandedPanel === 'content' ? 'flex-1' : 'w-0'} transition-all duration-500 ease-in-out overflow-hidden relative ${expandedPanel === 'content' ? 'bg-white' : 'bg-gray-50'}`}>
+          {/* Always visible toggle button for content panel */}
+          <div className="absolute top-4 left-4 z-10">
+            <button
+              onClick={() => setExpandedPanel(expandedPanel === 'content' ? 'input' : 'content')}
+              className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md border border-gray-200 transition-all duration-200 hover:shadow-lg"
+              title={expandedPanel === 'content' ? 'Show input' : 'Show content'}
+            >
+              <svg className="w-5 h-5 text-gray-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {expandedPanel === 'content' ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                )}
+              </svg>
+            </button>
+          </div>
+          
+          {/* Collapsed state indicator for content */}
+          {expandedPanel !== 'content' && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-5">
+              <div className="text-xs text-gray-500 font-medium writing-mode-vertical-rl text-orientation-mixed">
+                Content
+              </div>
+            </div>
+          )}
+          <div className="h-full flex">
+            {/* Funder Details Panel */}
+            <div className="w-1/3 border-r border-gray-200 p-4 bg-gray-50/30">
           {selectedNode ? (
             <div className="h-full overflow-y-auto">
               {isLoadingPanel ? (
@@ -686,10 +749,10 @@ export default function Home() {
               </div>
             </div>
           )}
-        </div>
+            </div>
 
-        {/* Middle Panel - Funding Map */}
-        <div className="col-span-6 row-span-12 border border-gray-200 relative">
+            {/* Graph Panel */}
+            <div className="flex-1 border-r border-gray-200 relative">
           {graph ? (
             <>
               <svg ref={svgRef} className="w-full h-full"></svg>
@@ -736,10 +799,10 @@ export default function Home() {
               </div>
             </div>
           )}
-        </div>
+            </div>
 
-        {/* Top Right Panel - Example Works Carousel */}
-        <div className="col-span-3 row-span-7 border border-gray-200 p-4 relative">
+            {/* Papers Panel */}
+            <div className="w-1/3 p-4 relative">
           {selectedNode && panelData && panelData.exemplars && panelData.exemplars.length > 0 ? (
             <div className="h-full flex flex-col">
               {/* Paper card takes up full panel */}
@@ -830,24 +893,46 @@ export default function Home() {
                           {work.grants && work.grants.length > 0 && (
                             <div className="flex items-start gap-2">
                               <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Funders:</span>
-                              <div className="flex-1 max-h-24 overflow-y-auto">
+                              <div className="flex-1 max-h-20 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
                                 <div className="flex flex-wrap gap-1">
-                                  {work.grants.map((grant: any, index: number) => {
-                                    const isSelectedFunder = grant.funder === selectedNode.id;
-                                    return (
+                                  {(() => {
+                                    // Deduplicate funders by name and combine counts
+                                    const funderMap = new Map();
+                                    work.grants.forEach((grant: any) => {
+                                      const funderName = grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder';
+                                      const isSelectedFunder = grant.funder === selectedNode.id;
+                                      
+                                      if (funderMap.has(funderName)) {
+                                        const existing = funderMap.get(funderName);
+                                        existing.count += 1;
+                                        if (isSelectedFunder) {
+                                          existing.isSelected = true;
+                                        }
+                                      } else {
+                                        funderMap.set(funderName, {
+                                          name: funderName,
+                                          count: 1,
+                                          isSelected: isSelectedFunder,
+                                          id: grant.funder
+                                        });
+                                      }
+                                    });
+                                    
+                                    return Array.from(funderMap.values()).map((funder, index) => (
                                       <span
                                         key={index}
-                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                          isSelectedFunder
+                                        className={`px-2 py-1 rounded-full text-xs font-medium truncate max-w-32 ${
+                                          funder.isSelected
                                             ? 'bg-blue-100 text-blue-800 border border-blue-200 font-bold'
                                             : 'bg-gray-100 text-gray-700 border border-gray-200'
                                         }`}
-                                        title={grant.funder_display_name}
+                                        title={funder.count > 1 ? `${funder.name} (${funder.count} grants)` : funder.name}
                                       >
-                                        {grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder'}
+                                        {funder.name}
+                                        {funder.count > 1 && ` (${funder.count})`}
                                       </span>
-                                    );
-                                  })}
+                                    ));
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -857,9 +942,11 @@ export default function Home() {
                             <div className="mt-4 pt-3 border-t border-gray-200">
                               <div className="flex items-start gap-2">
                                 <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Abstract:</span>
-                                <p className="text-gray-700 text-sm leading-relaxed line-clamp-6">
-                                  {abstract}
-                                </p>
+                                <div className="flex-1 max-h-32 overflow-y-auto">
+                                  <p className="text-gray-700 text-sm leading-relaxed">
+                                    {abstract}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -884,26 +971,26 @@ export default function Home() {
                 })()}
               </div>
               
-              {/* Navigation controls at bottom middle - fixed position */}
-              <div className="flex justify-center items-center gap-3 mt-4 flex-shrink-0">
+              {/* Navigation controls - sleek and minimal */}
+              <div className="flex justify-center items-center gap-6 mt-6 flex-shrink-0">
                 <button
                   onClick={() => setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1))}
                   disabled={currentWorkIndex === 0}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <span className="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                  {currentWorkIndex + 1} / {panelData.exemplars.length}
+                <span className="text-sm text-gray-500">
+                  {currentWorkIndex + 1} of {panelData.exemplars.length}
                 </span>
                 <button
                   onClick={() => setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1))}
                   disabled={currentWorkIndex === panelData.exemplars.length - 1}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -923,6 +1010,8 @@ export default function Home() {
               </div>
             </div>
           )}
+            </div>
+          </div>
         </div>
 
       </div>

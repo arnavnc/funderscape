@@ -55,8 +55,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 6) OA share
     const oaData = await fetch(oa(`/works?filter=grants.funder:${funderId},publication_year:${y}-&group_by=open_access.is_oa&per-page=2`)).then(r=>r.json());
-    const oaTrue = oaData.group_by?.find((g:any)=>g.key===true)?.count ?? 0;
-    const oaTotal = (oaData.group_by?.[0]?.count ?? 0) + (oaData.group_by?.[1]?.count ?? 0);
+    const oaTrue = oaData.group_by?.find((g:any)=>g.key==="1")?.count ?? 0;
+    const oaFalse = oaData.group_by?.find((g:any)=>g.key==="0")?.count ?? 0;
+    const oaTotal = oaTrue + oaFalse;
     const oaShare = oaTotal ? oaTrue/oaTotal : 0;
 
     // 7) Exemplars (evidence list) - Enhanced with rich metadata
