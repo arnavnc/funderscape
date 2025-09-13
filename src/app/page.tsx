@@ -288,7 +288,7 @@ export default function Home() {
       <div className="grid grid-cols-12 grid-rows-12 h-full w-full">
         
         {/* Top Left Panel - Search/Input */}
-        <div className="col-span-3 row-span-6 border border-gray-200 p-6">
+        <div className="col-span-3 row-span-5 border border-gray-200 p-6">
           <div className="h-full flex flex-col">
             <h1 className="text-2xl font-bold text-indigo-700 mb-6">funderscape.</h1>
             
@@ -739,54 +739,86 @@ export default function Home() {
         </div>
 
         {/* Top Right Panel - Example Works Carousel */}
-        <div className="col-span-3 row-span-6 border border-gray-200 p-4">
+        <div className="col-span-3 row-span-7 border border-gray-200 p-4 relative">
           {selectedNode && panelData && panelData.exemplars && panelData.exemplars.length > 0 ? (
             <div className="h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900">Example Works</h3>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1))}
-                    disabled={currentWorkIndex === 0}
-                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <span className="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                    {currentWorkIndex + 1} / {panelData.exemplars.length}
-                  </span>
-                  <button
-                    onClick={() => setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1))}
-                    disabled={currentWorkIndex === panelData.exemplars.length - 1}
-                    className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              {/* Paper card takes up full panel */}
+              <div className="flex-1">
               
-              <div className="flex-1 flex flex-col">
                 {(() => {
                   const work = panelData.exemplars[currentWorkIndex];
+                  
+                  // Helper function to get first author
+                  const getFirstAuthor = (authorships: any[]) => {
+                    if (!authorships || authorships.length === 0) return null;
+                    const firstAuthor = authorships[0];
+                    return firstAuthor.author?.display_name || 'Unknown Author';
+                  };
+                  
+                  // Helper function to reconstruct abstract from inverted index
+                  const getAbstract = (abstractInvertedIndex: any) => {
+                    if (!abstractInvertedIndex) return null;
+                    
+                    // Convert inverted index to text
+                    const words: { [key: number]: string } = {};
+                    for (const [word, positions] of Object.entries(abstractInvertedIndex)) {
+                      if (Array.isArray(positions)) {
+                        positions.forEach((pos: number) => {
+                          words[pos] = word;
+                        });
+                      }
+                    }
+                    
+                    const maxPos = Math.max(...Object.keys(words).map(Number));
+                    let abstract = '';
+                    for (let i = 0; i <= maxPos; i++) {
+                      if (words[i]) {
+                        abstract += (i > 0 ? ' ' : '') + words[i];
+                      }
+                    }
+                    
+                    return abstract || null;
+                  };
+                  
+                  const firstAuthor = getFirstAuthor(work.authorships || []);
+                  const abstract = getAbstract(work.abstract_inverted_index);
+                  const source = work.primary_location?.source?.display_name;
+                  
                   return (
-                    <div className="flex-1 flex flex-col bg-gray-50 rounded-lg p-4">
-                      <div className="flex-1">
-                        <h4 className="text-base font-bold text-gray-900 mb-3 line-clamp-3 leading-tight">
+                    <div className="h-full flex flex-col rounded-lg p-4">
+                      <div className="flex-1 overflow-y-auto">
+                        <h4 className="text-lg font-bold text-gray-900 mb-4 line-clamp-3 leading-tight">
                           {work.display_name}
                         </h4>
-                        <div className="space-y-3 text-sm">
+                        
+                        <div className="space-y-2 text-sm">
+                          {firstAuthor && (
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Author:</span>
+                              <span className="text-gray-900 font-medium">
+                                {firstAuthor}
+                                {work.authorships && work.authorships.length > 1 && ' et al.'}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {source && (
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Source:</span>
+                              <span className="text-gray-900 font-medium">{source}</span>
+                            </div>
+                          )}
+                          
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700">Year:</span>
+                            <span className="font-semibold text-gray-700 flex-shrink-0">Year:</span>
                             <span className="text-gray-900 font-medium">{work.publication_year}</span>
                           </div>
+                          
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700">Citations:</span>
+                            <span className="font-semibold text-gray-700 flex-shrink-0">Citations:</span>
                             <span className="text-gray-900 font-medium">{work.cited_by_count?.toLocaleString() ?? 0}</span>
                           </div>
+                          
                           {work.open_access?.is_oa && (
                             <div className="flex items-center gap-2">
                               <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold border border-green-200">
@@ -794,10 +826,47 @@ export default function Home() {
                               </span>
                             </div>
                           )}
+                          
+                          {work.grants && work.grants.length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Funders:</span>
+                              <div className="flex-1 max-h-24 overflow-y-auto">
+                                <div className="flex flex-wrap gap-1">
+                                  {work.grants.map((grant: any, index: number) => {
+                                    const isSelectedFunder = grant.funder === selectedNode.id;
+                                    return (
+                                      <span
+                                        key={index}
+                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                          isSelectedFunder
+                                            ? 'bg-blue-100 text-blue-800 border border-blue-200 font-bold'
+                                            : 'bg-gray-100 text-gray-700 border border-gray-200'
+                                        }`}
+                                        title={grant.funder_display_name}
+                                      >
+                                        {grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder'}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {abstract && (
+                            <div className="mt-4 pt-3 border-t border-gray-200">
+                              <div className="flex items-start gap-2">
+                                <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Abstract:</span>
+                                <p className="text-gray-700 text-sm leading-relaxed line-clamp-6">
+                                  {abstract}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
-                      <div className="mt-4 pt-3 border-t border-gray-200">
+                      <div className="mt-4 pt-3 border-t border-gray-200 flex-shrink-0">
                         <a
                           href={work.id}
                           target="_blank"
@@ -813,6 +882,36 @@ export default function Home() {
                     </div>
                   );
                 })()}
+              </div>
+              
+              {/* Navigation controls at bottom middle - fixed position */}
+              <div className="flex justify-center items-center gap-3 mt-4 flex-shrink-0">
+                <button
+                  onClick={() => setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1))}
+                  disabled={currentWorkIndex === 0}
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                  {currentWorkIndex + 1} / {panelData.exemplars.length}
+                </span>
+                <button
+                  onClick={() => setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1))}
+                  disabled={currentWorkIndex === panelData.exemplars.length - 1}
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Title in bottom right */}
+              <div className="absolute bottom-4 right-4 text-xs text-gray-500">
+                Top Papers • {selectedNode.name} • {selectedTopics.map(t => t.display_name).join(', ')}
               </div>
             </div>
           ) : (
