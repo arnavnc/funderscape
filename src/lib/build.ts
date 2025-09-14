@@ -93,7 +93,7 @@ async function enrichFunders(ids: string[], fromYear: number): Promise<GraphNode
             code: cg.key,
             count: cg.count,
           }));
-      } catch (enrichError) {
+      } catch {
         console.warn(`Failed to get enrichment data for ${id}, using basic profile only`);
       }
       

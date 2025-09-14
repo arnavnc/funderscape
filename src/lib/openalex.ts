@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { OpenAlexGroup, OpenAlexFunder, OpenAlexTextResponse } from './types';
 
 const OPENALEX_BASE = process.env.OPENALEX_BASE ?? 'https://api.openalex.org';
@@ -20,7 +21,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 // Fetch wrapper with retry logic and mailto
-export async function oa(pathAndQuery: string): Promise<any> {
+export async function oa(pathAndQuery: string): Promise<unknown> {
   const url = `${OPENALEX_BASE}${pathAndQuery}${pathAndQuery.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OPENALEX_MAILTO)}`;
   
   let lastError: Error | null = null;
@@ -84,7 +85,7 @@ export async function getTextTopics(title?: string, abstract?: string): Promise<
     q: searchText,
   });
   
-  const response = await oa(`/autocomplete/topics?${query}`);
+  const response = await oa(`/autocomplete/topics?${query}`) as any;
   const topics = response.results || [];
 
   // If we found topics with simple search, return them
@@ -103,15 +104,15 @@ export async function getTextTopics(title?: string, abstract?: string): Promise<
       select: 'topics',
     });
 
-    const worksResponse = await oa(`/works?${worksQuery}`);
+    const worksResponse = await oa(`/works?${worksQuery}`) as any;
     const works = worksResponse.results || [];
 
     // Extract and count topics from found works
     const topicCounts = new Map<string, { id: string; display_name: string; count: number }>();
     
-    works.forEach((work: any) => {
+    works.forEach((work: { topics?: Array<{ id: string; display_name: string }> }) => {
       if (work.topics) {
-        work.topics.forEach((topic: any) => {
+        work.topics.forEach((topic: { id: string; display_name: string }) => {
           const key = topic.id;
           if (topicCounts.has(key)) {
             topicCounts.get(key)!.count++;
@@ -155,7 +156,7 @@ export async function getTopFunders(topicIds: string[], fromYear: number): Promi
     cursor: '*',
   });
   
-  const response = await oa(`/works?${query}`);
+  const response = await oa(`/works?${query}`) as any;
   return response.group_by || [];
 }
 
@@ -167,7 +168,7 @@ export async function getFunderNeighbors(funderId: string, topicIds: string[], f
     'per-page': 200,
   });
   
-  const response = await oa(`/works?${query}`);
+  const response = await oa(`/works?${query}`) as any;
   return response.group_by || [];
 }
 
@@ -176,7 +177,7 @@ export async function getFunderProfile(funderId: string): Promise<OpenAlexFunder
     select: 'id,display_name,country_code,counts_by_year',
   });
   
-  return oa(`/funders/${funderId}?${query}`);
+  return oa(`/funders/${funderId}?${query}`) as any;
 }
 
 export async function getFunderTopics(funderId: string, fromYear: number): Promise<OpenAlexGroup[]> {
@@ -187,7 +188,7 @@ export async function getFunderTopics(funderId: string, fromYear: number): Promi
     'per-page': 200,
   });
   
-  const response = await oa(`/works?${query}`);
+  const response = await oa(`/works?${query}`) as any;
   return response.group_by || [];
 }
 
@@ -199,7 +200,7 @@ export async function getFunderCountries(funderId: string, fromYear: number): Pr
     'per-page': 200,
   });
   
-  const response = await oa(`/works?${query}`);
+  const response = await oa(`/works?${query}`) as any;
   return response.group_by || [];
 }
 

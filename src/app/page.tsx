@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import * as d3 from 'd3';
+import Image from 'next/image';
 import { GraphNode, GraphEdge, GraphResponse, OpenAlexTopic, OpenAlexAutocomplete } from '../lib/types';
 import { fetchFunderPanel } from '../lib/panel';
 import { Waves } from '../components/ui/waves-background';
@@ -33,7 +34,72 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [graph, setGraph] = useState<GraphResponse | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [panelData, setPanelData] = useState<any>(null);
+  const [panelData, setPanelData] = useState<{
+    funder: {
+      display_name: string;
+      image_thumbnail_url?: string;
+      country_code?: string;
+      roles?: Array<{ role: string }>;
+    };
+    kpis: {
+      worksInWindow: number;
+      worksInTopic?: number;
+      oaShare: number;
+      topicSharePct?: number;
+    };
+    cofunders?: Array<{
+      id: string;
+      name: string;
+      count: number;
+    }>;
+    topics?: Array<{
+      key: string;
+      key_display_name?: string;
+      count: number;
+    }>;
+    exemplars?: Array<{
+      id: string;
+      display_name: string;
+      doi?: string;
+      publication_date?: string;
+      authorships?: Array<{
+        author: {
+          display_name: string;
+        };
+      }>;
+      primary_location?: {
+        source: {
+          display_name: string;
+        };
+      };
+      open_access?: {
+        is_oa: boolean;
+      };
+      cited_by_count: number;
+      funders?: Array<{
+        display_name: string;
+      }>;
+      abstract_inverted_index?: Record<string, number[]>;
+      grants?: Array<{
+        funder_display_name?: string;
+        funder?: string;
+      }>;
+    }>;
+    topicMix?: {
+      groups?: Array<{
+        key: string;
+        key_display_name?: string;
+        count: number;
+      }>;
+    };
+    venues?: {
+      groups?: Array<{
+        key: string;
+        key_display_name?: string;
+        count: number;
+      }>;
+    };
+  } | null>(null);
   const [isLoadingPanel, setIsLoadingPanel] = useState<boolean>(false);
   const [currentWorkIndex, setCurrentWorkIndex] = useState<number>(0);
   const [textInput, setTextInput] = useState<string>('');
@@ -57,22 +123,25 @@ export default function Home() {
     svg.attr('width', width).attr('height', height);
 
     // Create zoom behavior
-    const zoom = d3.zoom()
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
-      .on('zoom', (event: any) => {
-        container.attr('transform', event.transform);
+      .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+        container.attr('transform', event.transform.toString());
       });
 
-    svg.call(zoom as any);
+    svg.call(zoom);
 
     // Create main container for zoomable content
     const container = svg.append('g');
 
     // Create force simulation with better size handling
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const simulation = d3.forceSimulation(graph.nodes as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .force('link', d3.forceLink(graph.edges).id((d: any) => d.id).distance(120).strength(0.6))
       .force('charge', d3.forceManyBody().strength(-400))
       .force('center', d3.forceCenter(width / 2, height / 2).strength(0.2))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .force('collision', d3.forceCollide().radius((d: any) => Math.sqrt(d.count) * 4 + 20))
       .force('x', d3.forceX(width / 2).strength(0.05))
       .force('y', d3.forceY(height / 2).strength(0.05));
@@ -84,7 +153,7 @@ export default function Home() {
       .enter().append('line')
       .attr('stroke', '#999')
       .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', (d: any) => Math.sqrt(d.weight) * 2);
+      .attr('stroke-width', (d: GraphEdge) => Math.sqrt(d.weight) * 2);
 
     // Create color scale for unique colors (matching legend)
     const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
@@ -95,7 +164,7 @@ export default function Home() {
       .selectAll('circle')
       .data(graph.nodes)
       .enter().append('circle')
-      .attr('r', (d: any) => Math.sqrt(d.count) * 4 + 20)
+      .attr('r', (d: GraphNode) => Math.sqrt(d.count) * 4 + 20)
       .attr('fill', 'none')
       .attr('stroke', '#ff6b6b')
       .attr('stroke-width', 3)
@@ -108,16 +177,16 @@ export default function Home() {
       .selectAll('circle')
       .data(graph.nodes)
       .enter().append('circle')
-      .attr('r', (d: any) => Math.sqrt(d.count) * 3 + 8)
-      .attr('fill', (d: any, i: number) => colorScale(i.toString()))
+      .attr('r', (d: GraphNode) => Math.sqrt(d.count) * 3 + 8)
+      .attr('fill', (d: GraphNode, i: number) => colorScale(i.toString()))
       .attr('stroke', '#fff')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
-      .on('click', async (_event: any, d: any) => {
+      .on('click', async (_event: MouseEvent, d: GraphNode) => {
         // Remove selection from all rings
         rings.style('opacity', 0);
         // Add selection ring to clicked node
-        rings.filter((node: any) => node.id === d.id)
+        rings.filter((node: GraphNode) => node.id === d.id)
           .style('opacity', 1);
         setSelectedNode(d);
         setCurrentWorkIndex(0); // Reset carousel to first work
@@ -139,10 +208,12 @@ export default function Home() {
           setIsLoadingPanel(false);
         }
       })
-      .on('mouseover', function(event: any, d: any) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .on('mouseover', function(_event: MouseEvent, _d: GraphNode) {
         d3.select(this).attr('stroke', '#000').attr('stroke-width', 3);
       })
-      .on('mouseout', function(event: any, d: any) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .on('mouseout', function(_event: MouseEvent, _d: GraphNode) {
         d3.select(this).attr('stroke', '#fff').attr('stroke-width', 2);
       });
 
@@ -151,17 +222,25 @@ export default function Home() {
     // Update positions on simulation tick
     simulation.on('tick', () => {
       links
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('x1', (d: any) => d.source.x)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('y1', (d: any) => d.source.y)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('x2', (d: any) => d.target.x)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('y2', (d: any) => d.target.y);
 
       nodes
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('cx', (d: any) => d.x)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('cy', (d: any) => d.y);
 
       rings
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('cx', (d: any) => d.x)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .attr('cy', (d: any) => d.y);
     });
 
@@ -169,7 +248,7 @@ export default function Home() {
     return () => {
       simulation.stop();
     };
-  }, [graph]);
+  }, [graph, activeTab, selectedTopics, textTabSelectedTopics, years]);
 
   const handleAnnotateText = async () => {
     if (!textInput.trim()) return;
@@ -582,8 +661,10 @@ export default function Home() {
                         {/* Header */}
                         <header className="flex items-start gap-3">
                           {panelData.funder.image_thumbnail_url && (
-                            <img 
+                            <Image 
                               src={panelData.funder.image_thumbnail_url} 
+                              width={48}
+                              height={48}
                               className="h-12 w-12 rounded-lg object-contain border border-gray-200" 
                               alt=""
                             />
@@ -596,7 +677,7 @@ export default function Home() {
                                   {panelData.funder.country_code}
                                 </span>
                               )}
-                              {(panelData.funder.roles || []).map((r: any) => (
+                              {(panelData.funder.roles || []).map((r: { role: string }) => (
                                 <span key={r.role} className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 font-medium">
                                   {r.role}
                                 </span>
@@ -663,9 +744,9 @@ export default function Home() {
                             <div className="text-sm font-semibold text-gray-800">Top co‑funders</div>
                           </div>
                           <div className="space-y-2">
-                            {panelData.cofunders?.length ? (
-                              panelData.cofunders.slice(0, 5).map((c: any, index: number) => {
-                                const maxCount = Math.max(...panelData.cofunders.slice(0, 5).map((item: any) => item.count));
+                            {panelData.cofunders && panelData.cofunders.length ? (
+                              panelData.cofunders.slice(0, 5).map((c: { id: string; name: string; count: number }, index: number) => {
+                                const maxCount = Math.max(...(panelData.cofunders?.slice(0, 5).map((item: { count: number }) => item.count) || [1]));
                                 const percentage = (c.count / maxCount) * 100;
                                 const colors = ['bg-amber-500', 'bg-orange-500', 'bg-red-500', 'bg-pink-500', 'bg-rose-500'];
                                 
@@ -706,8 +787,8 @@ export default function Home() {
                             <div className="text-sm font-semibold text-gray-800">Research focus</div>
                           </div>
                           <div className="space-y-3">
-                            {panelData.topicMix.groups?.slice(0, 5).map((g: any, index: number) => {
-                              const maxCount = Math.max(...(panelData.topicMix.groups?.slice(0, 5).map((item: any) => item.count) || [1]));
+                            {panelData.topicMix?.groups?.slice(0, 5).map((g: { key: string; key_display_name?: string; count: number }, index: number) => {
+                              const maxCount = Math.max(...(panelData.topicMix?.groups?.slice(0, 5).map((item: { count: number }) => item.count) || [1]));
                               const percentage = (g.count / maxCount) * 100;
                               const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
                               
@@ -738,8 +819,8 @@ export default function Home() {
                             <div className="text-sm font-semibold text-gray-800">Top sources</div>
                           </div>
                           <div className="space-y-2">
-                            {panelData.venues.groups?.slice(0, 6).map((g: any, index: number) => {
-                              const maxCount = Math.max(...(panelData.venues.groups?.slice(0, 6).map((item: any) => item.count) || [1]));
+                            {panelData.venues?.groups?.slice(0, 6).map((g: { key: string; key_display_name?: string; count: number }, index: number) => {
+                              const maxCount = Math.max(...(panelData.venues?.groups?.slice(0, 6).map((item: { count: number }) => item.count) || [1]));
                               const percentage = (g.count / maxCount) * 100;
                               const colors = ['bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500'];
                               
@@ -819,7 +900,7 @@ export default function Home() {
               </button> */}
               <div className="absolute top-4 right-4 bg-white/95 p-3 rounded-lg shadow-sm max-w-64 max-h-80 overflow-y-auto border border-gray-200">
                 <div className="space-y-1">
-                  {graph.nodes.map((node: any, index: number) => {
+                  {graph.nodes.map((node: GraphNode, index: number) => {
                     const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
                     const color = colors[index % colors.length];
                     return (
@@ -858,14 +939,14 @@ export default function Home() {
                   const work = panelData.exemplars[currentWorkIndex];
                   
                   // Helper function to get first author
-                  const getFirstAuthor = (authorships: any[]) => {
+                  const getFirstAuthor = (authorships: Array<{ author: { display_name: string } }>) => {
                     if (!authorships || authorships.length === 0) return null;
                     const firstAuthor = authorships[0];
                     return firstAuthor.author?.display_name || 'Unknown Author';
                   };
                   
                   // Helper function to reconstruct abstract from inverted index
-                  const getAbstract = (abstractInvertedIndex: any) => {
+                  const getAbstract = (abstractInvertedIndex: Record<string, number[]>) => {
                     if (!abstractInvertedIndex) return null;
                     
                     // Convert inverted index to text
@@ -890,7 +971,7 @@ export default function Home() {
                   };
                   
                   const firstAuthor = getFirstAuthor(work.authorships || []);
-                  const abstract = getAbstract(work.abstract_inverted_index);
+                  const abstract = work.abstract_inverted_index ? getAbstract(work.abstract_inverted_index) : null;
                   const source = work.primary_location?.source?.display_name;
                   
                   return (
@@ -903,8 +984,8 @@ export default function Home() {
                         
                         {/* Year + Source inline */}
                         <div className="text-sm text-gray-600 mb-1">
-                          {source && work.publication_year && (
-                            <span>{source} • {work.publication_year}</span>
+                          {source && work.publication_date && (
+                            <span>{source} • {new Date(work.publication_date).getFullYear()}</span>
                           )}
                         </div>
                         
@@ -939,7 +1020,7 @@ export default function Home() {
                               {(() => {
                                 // Deduplicate funders by name and combine counts
                                 const funderMap = new Map();
-                                work.grants.forEach((grant: any) => {
+                                work.grants.forEach((grant: { funder_display_name?: string; funder?: string }) => {
                                   const funderName = grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder';
                                   const isSelectedFunder = grant.funder === selectedNode.id;
                                   
@@ -1038,7 +1119,7 @@ export default function Home() {
               <div className="flex flex-col items-center gap-3 mt-4 mb-2 flex-shrink-0">
                 {/* Progress Dots */}
                 <div className="flex items-center gap-1 px-2 py-1">
-                  {Array.from({ length: Math.min(panelData.exemplars.length, 5) }, (_, index) => (
+                  {Array.from({ length: Math.min(panelData.exemplars?.length || 0, 5) }, (_, index) => (
                     <button
                       key={index}
                       onClick={() => setCurrentWorkIndex(index)}
@@ -1049,9 +1130,9 @@ export default function Home() {
                       }`}
                     />
                   ))}
-                  {panelData.exemplars.length > 5 && (
+                  {(panelData.exemplars?.length || 0) > 5 && (
                     <span className="text-xs text-gray-500 ml-1">
-                      +{panelData.exemplars.length - 5}
+                      +{(panelData.exemplars?.length || 0) - 5}
                     </span>
                   )}
                 </div>
@@ -1072,15 +1153,15 @@ export default function Home() {
                   </button>
                   
                   <span className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-full">
-                    {currentWorkIndex + 1} of {panelData.exemplars.length}
+                    {currentWorkIndex + 1} of {panelData.exemplars?.length || 0}
                   </span>
                   
                   <button
                     onClick={() => {
-                      setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1));
+                      setCurrentWorkIndex(Math.min((panelData.exemplars?.length || 1) - 1, currentWorkIndex + 1));
                       setExpandedAbstract(false); // Reset abstract expansion
                     }}
-                    disabled={currentWorkIndex === panelData.exemplars.length - 1}
+                    disabled={currentWorkIndex === (panelData.exemplars?.length || 1) - 1}
                     className="p-3 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
                   >
                     <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1091,9 +1172,9 @@ export default function Home() {
               </div>
               
               {/* Title in bottom right - moved up to avoid overlap */}
-              <div className="absolute bottom-20 right-4 text-xs text-gray-500 bg-white/90 px-2 py-1 rounded">
+              {/* <div className="absolute bottom-20 right-4 text-xs text-gray-500 bg-white/90 px-2 py-1 rounded">
                 Top Papers • {selectedNode.name} • {(activeTab === 'topics' ? selectedTopics : textTabSelectedTopics).map(t => t.display_name).join(', ')}
-              </div>
+              </div> */}
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-gray-400">

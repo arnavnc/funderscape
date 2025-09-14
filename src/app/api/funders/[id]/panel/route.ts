@@ -30,23 +30,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 2) Works in window (no topic filter)
     const windowGroups = await fetch(oa(`/works?filter=grants.funder:${funderId},publication_year:${y}-&group_by=grants.funder&per-page=200`)).then(r=>r.json());
-    const worksInWindow = windowGroups.group_by?.find((g:any)=>g.key===funder.id)?.count ?? 0;
+    const worksInWindow = windowGroups.group_by?.find((g: { key: string; count: number })=>g.key===funder.id)?.count ?? 0;
 
     // 3) Topic share (requires topicIds)
     let worksInTopic = 0, topicSharePct = 0;
     if (topicIds.length) {
       const all = await fetch(oa(`/works?filter=${topics}publication_year:${y}-&group_by=grants.funder&per-page=200&cursor=*`)).then(r=>r.json());
-      const total = all.group_by?.reduce((a:number,g:any)=>a+g.count,0) ?? 0;
-      worksInTopic = all.group_by?.find((g:any)=>g.key===funder.id)?.count ?? 0;
+      const total = all.group_by?.reduce((a:number,g: { count: number })=>a+g.count,0) ?? 0;
+      worksInTopic = all.group_by?.find((g: { key: string; count: number })=>g.key===funder.id)?.count ?? 0;
       topicSharePct = total ? (worksInTopic/total*100) : 0;
     }
 
     // 4) Co‑funders (within topic filter if provided)
     const neigh = await fetch(oa(`/works?filter=grants.funder:${funderId},${topics}publication_year:${y}-&group_by=grants.funder&per-page=200`)).then(r=>r.json());
     const cofunders = (neigh.group_by||[])
-      .filter((g:any)=>g.key!==funder.id)
-      .sort((a:any,b:any)=>b.count-a.count).slice(0,10)
-      .map((g:any)=>({ id:g.key, name:g.key_display_name ?? g.key, count:g.count }));
+      .filter((g: { key: string })=>g.key!==funder.id)
+      .sort((a: { count: number },b: { count: number })=>b.count-a.count).slice(0,10)
+      .map((g: { key: string; key_display_name?: string; count: number })=>({ id:g.key, name:g.key_display_name ?? g.key, count:g.count }));
 
     // 5) Topic mix, venues, geo (window only)
     const topicMix = await fetch(oa(`/works?filter=grants.funder:${funderId},publication_year:${y}-&group_by=topics.field.id&per-page=200`)).then(r=>r.json());
@@ -55,8 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 6) OA share
     const oaData = await fetch(oa(`/works?filter=grants.funder:${funderId},publication_year:${y}-&group_by=open_access.is_oa&per-page=2`)).then(r=>r.json());
-    const oaTrue = oaData.group_by?.find((g:any)=>g.key==="1")?.count ?? 0;
-    const oaFalse = oaData.group_by?.find((g:any)=>g.key==="0")?.count ?? 0;
+    const oaTrue = oaData.group_by?.find((g: { key: string; count: number })=>g.key==="1")?.count ?? 0;
+    const oaFalse = oaData.group_by?.find((g: { key: string; count: number })=>g.key==="0")?.count ?? 0;
     const oaTotal = oaTrue + oaFalse;
     const oaShare = oaTotal ? oaTrue/oaTotal : 0;
 
