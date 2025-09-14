@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 import { GraphNode, GraphEdge, GraphResponse, OpenAlexTopic, OpenAlexAutocomplete } from '../lib/types';
 import { fetchFunderPanel } from '../lib/panel';
+import { Waves } from '../components/ui/waves-background';
 
 export default function Home() {
   const [selectedTopics, setSelectedTopics] = useState<OpenAlexAutocomplete[]>([
@@ -40,6 +41,7 @@ export default function Home() {
   const [textTabSelectedTopics, setTextTabSelectedTopics] = useState<OpenAlexAutocomplete[]>([]);
   const [activeTab, setActiveTab] = useState<'topics' | 'text'>('topics');
   const [expandedPanel, setExpandedPanel] = useState<'input' | 'content'>('input');
+  const [expandedAbstract, setExpandedAbstract] = useState<boolean>(false);
   
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -531,17 +533,38 @@ export default function Home() {
         </div>
 
         {/* Content Panel - Collapsible */}
-        <div className={`${expandedPanel === 'content' ? 'flex-1' : 'w-0'} transition-all duration-500 ease-in-out overflow-hidden relative ${expandedPanel === 'content' ? 'bg-white' : 'bg-gray-50'}`}>
+        <div className="flex-1 transition-all duration-500 ease-in-out overflow-hidden relative bg-gray-50">
+          
+          {/* Waves background when input panel is expanded */}
+          {expandedPanel === 'input' && (
+            <div className="absolute inset-0">
+              <Waves
+                lineColor="rgba(99, 102, 241, 0.2)"
+                backgroundColor="transparent"
+                waveSpeedX={0.015}
+                waveSpeedY={0.008}
+                waveAmpX={35}
+                waveAmpY={18}
+                friction={0.92}
+                tension={0.008}
+                maxCursorMove={80}
+                xGap={15}
+                yGap={40}
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 via-transparent to-blue-50/20" />
+            </div>
+          )}
           
           {/* Collapsed state indicator for content */}
           {expandedPanel !== 'content' && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-5">
-              <div className="text-xs text-gray-500 font-medium writing-mode-vertical-rl text-orientation-mixed">
-                Content
+              <div className="text-xs text-gray-500 font-light writing-mode-vertical-rl text-orientation-mixed">
+                funderscape.
               </div>
             </div>
           )}
-          <div className="h-full flex">
+          {expandedPanel === 'content' && (
+            <div className="h-full flex">
             {/* Funder Details Panel */}
             <div className="w-1/3 border-r border-gray-200 p-4 bg-gray-50/30">
           {selectedNode ? (
@@ -782,7 +805,7 @@ export default function Home() {
               <div className="absolute bottom-4 right-4 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
                 {graph.nodes.length} funders • {graph.edges.length} connections • {(activeTab === 'topics' ? selectedTopics : textTabSelectedTopics).map(t => t.display_name).join(', ')} • {graph.meta.fromYear}
               </div>
-              <button 
+              {/* <button 
                 onClick={() => {
                   const svg = d3.select(svgRef.current);
                   const zoom = d3.zoom();
@@ -793,7 +816,7 @@ export default function Home() {
                 className="absolute bottom-4 left-4 bg-white/90 hover:bg-white text-gray-700 px-3 py-1 rounded text-xs border border-gray-200 shadow-sm transition-colors"
               >
                 Reset View
-              </button>
+              </button> */}
               <div className="absolute top-4 right-4 bg-white/95 p-3 rounded-lg shadow-sm max-w-64 max-h-80 overflow-y-auto border border-gray-200">
                 <div className="space-y-1">
                   {graph.nodes.map((node: any, index: number) => {
@@ -871,82 +894,83 @@ export default function Home() {
                   const source = work.primary_location?.source?.display_name;
                   
                   return (
-                    <div className="h-full flex flex-col rounded-lg p-4">
-                      <div className="flex-1 overflow-y-auto">
-                        <h4 className="text-lg font-bold text-gray-900 mb-4 line-clamp-3 leading-tight">
+                    <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200">
+                      {/* Compact Header */}
+                      <div className="p-4 border-b border-gray-100">
+                        <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 leading-tight hover:text-blue-600 cursor-pointer transition-colors">
                           {work.display_name}
                         </h4>
                         
-                        <div className="space-y-2 text-sm">
-                          {firstAuthor && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Author:</span>
-                              <span className="text-gray-900 font-medium">
-                                {firstAuthor}
-                                {work.authorships && work.authorships.length > 1 && ' et al.'}
-                              </span>
-                            </div>
+                        {/* Year + Source inline */}
+                        <div className="text-sm text-gray-600 mb-1">
+                          {source && work.publication_year && (
+                            <span>{source} • {work.publication_year}</span>
                           )}
-                          
-                          {source && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Source:</span>
-                              <span className="text-gray-900 font-medium">{source}</span>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700 flex-shrink-0">Year:</span>
-                            <span className="text-gray-900 font-medium">{work.publication_year}</span>
+                        </div>
+                        
+                        {/* Author subline */}
+                        {firstAuthor && (
+                          <div className="text-sm text-gray-500">
+                            {firstAuthor}
+                            {work.authorships && work.authorships.length > 1 && ' et al.'}
                           </div>
-                          
+                        )}
+                      </div>
+
+                      {/* Metadata Badges */}
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-700 flex-shrink-0">Citations:</span>
-                            <span className="text-gray-900 font-medium">{work.cited_by_count?.toLocaleString() ?? 0}</span>
-                          </div>
-                          
-                          {work.open_access?.is_oa && (
-                            <div className="flex items-center gap-2">
-                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold border border-green-200">
+                            {work.open_access?.is_oa && (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                 Open Access
                               </span>
-                            </div>
-                          )}
-                          
-                          {work.grants && work.grants.length > 0 && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Funders:</span>
-                              <div className="flex-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                <div className="flex flex-wrap gap-1">
-                                  {(() => {
-                                    // Deduplicate funders by name and combine counts
-                                    const funderMap = new Map();
-                                    work.grants.forEach((grant: any) => {
-                                      const funderName = grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder';
-                                      const isSelectedFunder = grant.funder === selectedNode.id;
-                                      
-                                      if (funderMap.has(funderName)) {
-                                        const existing = funderMap.get(funderName);
-                                        existing.count += 1;
-                                        if (isSelectedFunder) {
-                                          existing.isSelected = true;
-                                        }
-                                      } else {
-                                        funderMap.set(funderName, {
-                                          name: funderName,
-                                          count: 1,
-                                          isSelected: isSelectedFunder,
-                                          id: grant.funder
-                                        });
-                                      }
+                            )}
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                              {work.cited_by_count?.toLocaleString() ?? 0} citations
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Funders */}
+                        {work.grants && work.grants.length > 0 && (
+                          <div className="mt-2">
+                            <div className="flex flex-wrap gap-1">
+                              {(() => {
+                                // Deduplicate funders by name and combine counts
+                                const funderMap = new Map();
+                                work.grants.forEach((grant: any) => {
+                                  const funderName = grant.funder_display_name || grant.funder?.split('/').pop() || 'Unknown Funder';
+                                  const isSelectedFunder = grant.funder === selectedNode.id;
+                                  
+                                  if (funderMap.has(funderName)) {
+                                    const existing = funderMap.get(funderName);
+                                    existing.count += 1;
+                                    if (isSelectedFunder) {
+                                      existing.isSelected = true;
+                                    }
+                                  } else {
+                                    funderMap.set(funderName, {
+                                      name: funderName,
+                                      count: 1,
+                                      isSelected: isSelectedFunder,
+                                      id: grant.funder
                                     });
-                                    
-                                    return Array.from(funderMap.values()).map((funder, index) => (
+                                  }
+                                });
+                                
+                                const funders = Array.from(funderMap.values());
+                                const displayFunders = funders.slice(0, 2);
+                                const hasMore = funders.length > 2;
+                                
+                                return (
+                                  <>
+                                    {displayFunders.map((funder, index) => (
                                       <span
                                         key={index}
-                                        className={`px-2 py-1 rounded-full text-xs font-medium truncate max-w-32 ${
+                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
                                           funder.isSelected
-                                            ? 'bg-blue-100 text-blue-800 border border-blue-200 font-bold'
+                                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
                                             : 'bg-gray-100 text-gray-700 border border-gray-200'
                                         }`}
                                         title={funder.count > 1 ? `${funder.name} (${funder.count} grants)` : funder.name}
@@ -954,79 +978,120 @@ export default function Home() {
                                         {funder.name}
                                         {funder.count > 1 && ` (${funder.count})`}
                                       </span>
-                                    ));
-                                  })()}
-                                </div>
-                              </div>
+                                    ))}
+                                    {hasMore && (
+                                      <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-medium">
+                                        +{funders.length - 2} more
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
-                          )}
-                          
-                          {abstract && (
-                            <div className="mt-6 pt-4 border-t border-gray-200">
-                              <div className="flex items-start gap-2">
-                                <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Abstract:</span>
-                                <div className="flex-1 max-h-32 overflow-y-auto">
-                                  <p className="text-gray-700 text-sm leading-relaxed">
-                                    {abstract}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Abstract */}
+                      {abstract && (
+                        <div className="flex-1 p-4">
+                          <div className="text-sm text-gray-700 leading-relaxed">
+                            {expandedAbstract ? (
+                              <p>{abstract}</p>
+                            ) : (
+                              <p className="line-clamp-3">{abstract}</p>
+                            )}
+                          </div>
+                          {abstract.length > 200 && (
+                            <button
+                              onClick={() => setExpandedAbstract(!expandedAbstract)}
+                              className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              {expandedAbstract ? 'Show less' : 'Expand Abstract'}
+                            </button>
                           )}
                         </div>
-                      </div>
-                      
-                      <div className="mt-6 pt-4 border-t border-gray-200 flex-shrink-0">
-                        <a
-                          href={work.id}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                        >
-                          View Paper
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
+                      )}
+
+                      {/* Action Row */}
+                      <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+                        <div className="flex items-center justify-between">
+                          <a
+                            href={work.doi || work.id}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          >
+                            View Paper
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        </div>
                       </div>
                     </div>
                   );
                 })()}
               </div>
               
-              {/* Navigation controls - sleek and minimal */}
-              <div className="flex justify-center items-center gap-4 mt-4 flex-shrink-0">
-                <button
-                  onClick={() => {
-                    console.log('Previous clicked, current index:', currentWorkIndex);
-                    setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1));
-                  }}
-                  disabled={currentWorkIndex === 0}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-full">
-                  {currentWorkIndex + 1} of {panelData.exemplars.length}
-                </span>
-                <button
-                  onClick={() => {
-                    console.log('Next clicked, current index:', currentWorkIndex);
-                    setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1));
-                  }}
-                  disabled={currentWorkIndex === panelData.exemplars.length - 1}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
+              {/* Enhanced Navigation controls */}
+              <div className="flex flex-col items-center gap-3 mt-4 mb-2 flex-shrink-0">
+                {/* Progress Dots */}
+                <div className="flex items-center gap-1 px-2 py-1">
+                  {Array.from({ length: Math.min(panelData.exemplars.length, 5) }, (_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentWorkIndex(index)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        index === currentWorkIndex
+                          ? 'bg-blue-600'
+                          : 'bg-gray-300 hover:bg-gray-400'
+                      }`}
+                    />
+                  ))}
+                  {panelData.exemplars.length > 5 && (
+                    <span className="text-xs text-gray-500 ml-1">
+                      +{panelData.exemplars.length - 5}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Navigation Buttons */}
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => {
+                      setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1));
+                      setExpandedAbstract(false); // Reset abstract expansion
+                    }}
+                    disabled={currentWorkIndex === 0}
+                    className="p-3 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  
+                  <span className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-full">
+                    {currentWorkIndex + 1} of {panelData.exemplars.length}
+                  </span>
+                  
+                  <button
+                    onClick={() => {
+                      setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1));
+                      setExpandedAbstract(false); // Reset abstract expansion
+                    }}
+                    disabled={currentWorkIndex === panelData.exemplars.length - 1}
+                    className="p-3 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               
-              {/* Title in bottom right */}
-              <div className="absolute bottom-4 right-4 text-xs text-gray-500">
+              {/* Title in bottom right - moved up to avoid overlap */}
+              <div className="absolute bottom-20 right-4 text-xs text-gray-500 bg-white/90 px-2 py-1 rounded">
                 Top Papers • {selectedNode.name} • {(activeTab === 'topics' ? selectedTopics : textTabSelectedTopics).map(t => t.display_name).join(', ')}
               </div>
             </div>
@@ -1041,6 +1106,7 @@ export default function Home() {
           )}
             </div>
           </div>
+          )}
         </div>
 
       </div>
