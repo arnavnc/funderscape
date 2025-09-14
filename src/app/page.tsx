@@ -37,6 +37,7 @@ export default function Home() {
   const [currentWorkIndex, setCurrentWorkIndex] = useState<number>(0);
   const [textInput, setTextInput] = useState<string>('');
   const [annotatedTopics, setAnnotatedTopics] = useState<OpenAlexTopic[]>([]);
+  const [textTabSelectedTopics, setTextTabSelectedTopics] = useState<OpenAlexAutocomplete[]>([]);
   const [activeTab, setActiveTab] = useState<'topics' | 'text'>('topics');
   const [expandedPanel, setExpandedPanel] = useState<'input' | 'content'>('input');
   
@@ -122,7 +123,8 @@ export default function Home() {
         // Fetch comprehensive panel data
         setIsLoadingPanel(true);
         try {
-          const topicIds = selectedTopics.map(t => t.id);
+          const currentSelectedTopics = activeTab === 'topics' ? selectedTopics : textTabSelectedTopics;
+          const topicIds = currentSelectedTopics.map(t => t.id);
           const panelData = await fetchFunderPanel(d.id, { 
             topicIds, 
             fromYear: new Date().getFullYear() - years + 1 
@@ -226,12 +228,18 @@ export default function Home() {
     setSelectedTopics(selectedTopics.filter(t => t.id !== topicId));
   };
 
+  // Remove topic from text tab selected list
+  const removeTextTabTopic = (topicId: string) => {
+    setTextTabSelectedTopics(textTabSelectedTopics.filter(t => t.id !== topicId));
+  };
+
   const handleBuildGraph = async () => {
-    if (selectedTopics.length === 0) return;
+    const currentSelectedTopics = activeTab === 'topics' ? selectedTopics : textTabSelectedTopics;
+    if (currentSelectedTopics.length === 0) return;
     
     setIsLoading(true);
     try {
-      const topicIdList = selectedTopics.map(topic => topic.id);
+      const topicIdList = currentSelectedTopics.map(topic => topic.id);
       const response = await fetch('/api/graph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,6 +249,8 @@ export default function Home() {
       if (!response.ok) throw new Error('Failed to build graph');
       const data = await response.json();
       setGraph(data);
+      // Auto-transition to content view when map is built
+      setExpandedPanel('content');
     } catch (error) {
       console.error('Error building graph:', error);
     } finally {
@@ -258,8 +268,8 @@ export default function Home() {
       entity_type: topic.entity_type,
       external_id: topic.external_id,
     };
-    if (!selectedTopics.find(t => t.id === topic.id)) {
-      setSelectedTopics([...selectedTopics, autocompleteTopic]);
+    if (!textTabSelectedTopics.find(t => t.id === topic.id)) {
+      setTextTabSelectedTopics([...textTabSelectedTopics, autocompleteTopic]);
     }
   };
 
@@ -299,9 +309,9 @@ export default function Home() {
             >
               <svg className="w-5 h-5 text-gray-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {expandedPanel === 'input' ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                ) : (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 )}
               </svg>
             </button>
@@ -462,6 +472,35 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Selected topics for text tab */}
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Selected Topics:</div>
+                    <div className="max-h-24 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
+                      <div className="flex flex-wrap gap-1">
+                        {textTabSelectedTopics.length > 0 ? (
+                          textTabSelectedTopics.map((topic) => (
+                            <div
+                              key={topic.id}
+                              className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium border border-green-200"
+                            >
+                              <span className="truncate max-w-24">{topic.display_name}</span>
+                              <button
+                                onClick={() => removeTextTabTopic(topic.id)}
+                                className="hover:bg-green-200 rounded-full p-0.5 transition-colors flex-shrink-0"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-gray-500 italic">No topics selected yet</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -481,7 +520,7 @@ export default function Home() {
 
               <button
                 onClick={handleBuildGraph}
-                disabled={isLoading || selectedTopics.length === 0}
+                disabled={isLoading || (activeTab === 'topics' ? selectedTopics.length === 0 : textTabSelectedTopics.length === 0)}
                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold shadow-sm"
               >
                 {isLoading ? 'Building...' : 'Build Map'}
@@ -493,22 +532,6 @@ export default function Home() {
 
         {/* Content Panel - Collapsible */}
         <div className={`${expandedPanel === 'content' ? 'flex-1' : 'w-0'} transition-all duration-500 ease-in-out overflow-hidden relative ${expandedPanel === 'content' ? 'bg-white' : 'bg-gray-50'}`}>
-          {/* Always visible toggle button for content panel */}
-          <div className="absolute top-4 left-4 z-10">
-            <button
-              onClick={() => setExpandedPanel(expandedPanel === 'content' ? 'input' : 'content')}
-              className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md border border-gray-200 transition-all duration-200 hover:shadow-lg"
-              title={expandedPanel === 'content' ? 'Show input' : 'Show content'}
-            >
-              <svg className="w-5 h-5 text-gray-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {expandedPanel === 'content' ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                )}
-              </svg>
-            </button>
-          </div>
           
           {/* Collapsed state indicator for content */}
           {expandedPanel !== 'content' && (
@@ -757,7 +780,7 @@ export default function Home() {
             <>
               <svg ref={svgRef} className="w-full h-full"></svg>
               <div className="absolute bottom-4 right-4 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
-                {graph.nodes.length} funders • {graph.edges.length} connections • {selectedTopics.map(t => t.display_name).join(', ')} • {graph.meta.fromYear}
+                {graph.nodes.length} funders • {graph.edges.length} connections • {(activeTab === 'topics' ? selectedTopics : textTabSelectedTopics).map(t => t.display_name).join(', ')} • {graph.meta.fromYear}
               </div>
               <button 
                 onClick={() => {
@@ -893,7 +916,7 @@ export default function Home() {
                           {work.grants && work.grants.length > 0 && (
                             <div className="flex items-start gap-2">
                               <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Funders:</span>
-                              <div className="flex-1 max-h-20 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50">
+                              <div className="flex-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
                                 <div className="flex flex-wrap gap-1">
                                   {(() => {
                                     // Deduplicate funders by name and combine counts
@@ -939,7 +962,7 @@ export default function Home() {
                           )}
                           
                           {abstract && (
-                            <div className="mt-4 pt-3 border-t border-gray-200">
+                            <div className="mt-6 pt-4 border-t border-gray-200">
                               <div className="flex items-start gap-2">
                                 <span className="font-semibold text-gray-700 min-w-0 flex-shrink-0">Abstract:</span>
                                 <div className="flex-1 max-h-32 overflow-y-auto">
@@ -953,7 +976,7 @@ export default function Home() {
                         </div>
                       </div>
                       
-                      <div className="mt-4 pt-3 border-t border-gray-200 flex-shrink-0">
+                      <div className="mt-6 pt-4 border-t border-gray-200 flex-shrink-0">
                         <a
                           href={work.id}
                           target="_blank"
@@ -972,25 +995,31 @@ export default function Home() {
               </div>
               
               {/* Navigation controls - sleek and minimal */}
-              <div className="flex justify-center items-center gap-6 mt-6 flex-shrink-0">
+              <div className="flex justify-center items-center gap-4 mt-4 flex-shrink-0">
                 <button
-                  onClick={() => setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1))}
+                  onClick={() => {
+                    console.log('Previous clicked, current index:', currentWorkIndex);
+                    setCurrentWorkIndex(Math.max(0, currentWorkIndex - 1));
+                  }}
                   disabled={currentWorkIndex === 0}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
                 >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-full">
                   {currentWorkIndex + 1} of {panelData.exemplars.length}
                 </span>
                 <button
-                  onClick={() => setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1))}
+                  onClick={() => {
+                    console.log('Next clicked, current index:', currentWorkIndex);
+                    setCurrentWorkIndex(Math.min(panelData.exemplars.length - 1, currentWorkIndex + 1));
+                  }}
                   disabled={currentWorkIndex === panelData.exemplars.length - 1}
-                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 bg-white shadow-sm"
                 >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -998,7 +1027,7 @@ export default function Home() {
               
               {/* Title in bottom right */}
               <div className="absolute bottom-4 right-4 text-xs text-gray-500">
-                Top Papers • {selectedNode.name} • {selectedTopics.map(t => t.display_name).join(', ')}
+                Top Papers • {selectedNode.name} • {(activeTab === 'topics' ? selectedTopics : textTabSelectedTopics).map(t => t.display_name).join(', ')}
               </div>
             </div>
           ) : (
